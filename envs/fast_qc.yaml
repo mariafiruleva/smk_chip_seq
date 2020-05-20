@@ -1,0 +1,4 @@
+channels:
+ - bioconda
+dependencies:
+ - bioconda-fastqc=08-01-19
