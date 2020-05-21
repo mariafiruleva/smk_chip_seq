@@ -1,7 +1,7 @@
 import re
 
 configfile: config.yaml
-
+genome = config['genome']
 import pandas as pd
 
 SAMPLES_INFO = pd.read_csv('data_table.tsv', sep='\t')
@@ -20,7 +20,7 @@ rule archive_results:
 
 rule fast_qc:
     input:lambda wildcards: expand("reads/{file_name}",
-                                   file_name=SAMPLES_INFO.loc[wildcards.sample == wildcards.sample, 'File'])
+                                   file_name=SAMPLES_INFO.loc[SAMPLES_INFO['SAMPLE'] == wildcards.sample, 'File'])
     output:
           html="qc/fastqc/{sample}.html",
           archive="qc/fastqc/{sample}_fastqc.zip"
@@ -40,13 +40,12 @@ rule fast_qc:
     """
 
 rule multi_qc:
-    input: expand(rules.fast_qc.output.html)
+    input: expand("qc/fastqc/{sample}.html", sample=SAMPLES_INFO['SAMPLE'])
     output: "qc/multiqc/reads.html"
     benchmark: "benchmarks/qc/multiqc/reads.txt"
     log: "logs/qc/multiqc/reads.log"
-    conda:
-         "envs/multi_qc.yaml"
-    shell: ""
+    wrapper:
+        "0.57.0/bio/multiqc"
 rule get_reference:
     input: ""
     output: "indexes/{genome}/{genome}.fa.gz"
@@ -54,11 +53,28 @@ rule get_reference:
     log: "logs/get_reference/get_reference_{genome}.log"
     shell:
          "wget http://hgdownload.soe.ucsc.edu/goldenPath/{wildcards.genome}/bigZips/{wildcards.genome}.fa.gz > {output}"
+
+rule bowtie2_index:
+    input: "indexes/{genome}/{genome}.fa.gz"
+    output:
+          temp_dir=temp(directory('bowtie-index/{genome}'))
+    log: "logs/build/{genome}.log"
+    benchmark: "benchmarks/build/{genome}.txt"
+    conda: 'envs/bowtie_build.yaml'
+    threads: 4
+    params:
+        basename=f'indexes/{config["genome"]}/{config["genome"]}'
+    shell: """
+    mkdir {output.temp_dir} && bowtie2-build {input} {params.basename} &> {log}
+    """
+
 rule alignment:
     input: ""
     output: "bams/{sample}_{genome}.bam"
     benchmark: "benchmarks/alignment/{sample}_{genome}.txt"
     log: "logs/alignment/{sample}_{genome}.log"
+    conda:
+         "envs/bowtie.yaml"
     shell: ""
 rule alignment_qc:
     input: ""
