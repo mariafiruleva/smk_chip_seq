@@ -47,7 +47,6 @@ rule multi_qc:
     wrapper:
         "0.57.0/bio/multiqc"
 rule get_reference:
-    input: ""
     output: "indexes/{genome}/{genome}.fa.gz"
     benchmark: "benchmarks/get_reference/get_reference_{genome}.txt"
     log: "logs/get_reference/get_reference_{genome}.log"
@@ -55,33 +54,42 @@ rule get_reference:
          "wget http://hgdownload.soe.ucsc.edu/goldenPath/{wildcards.genome}/bigZips/{wildcards.genome}.fa.gz > {output}"
 
 rule bowtie2_index:
-    input: "indexes/{genome}/{genome}.fa.gz"
+    input: rules.get_reference.output
     output:
-          temp_dir=temp(directory('bowtie-index/{genome}'))
+          'indexes/{genome}/{genome}.1.bt2', 'indexes/{genome}/{genome}.2.bt2',
+          'indexes/{genome}/{genome}.3.bt2', 'indexes/{genome}/{genome}.4.bt2',
+           'indexes/{genome}/{genome}.rev.1.bt2', 'indexes/{genome}/{genome}.rev.2.bt2'
     log: "logs/build/{genome}.log"
     benchmark: "benchmarks/build/{genome}.txt"
     conda: 'envs/bowtie_build.yaml'
     threads: 4
     params:
         basename=f'indexes/{config["genome"]}/{config["genome"]}'
-    shell: """
-    mkdir {output.temp_dir} && bowtie2-build {input} {params.basename} &> {log}
-    """
+    shell: "bowtie2-build {input} {params.basename} &> {log}"
 
 rule alignment:
-    input: ""
+    input: sample=lambda wildcards: expand("reads/{file_name}", file_name=SAMPLES_INFO.loc[SAMPLES_INFO['SAMPLE'] == wildcards.sample, 'File']),
+           index_path=rules.bowtie2_index.output
     output: "bams/{sample}_{genome}.bam"
     benchmark: "benchmarks/alignment/{sample}_{genome}.txt"
     log: "logs/alignment/{sample}_{genome}.log"
-    conda:
-         "envs/bowtie.yaml"
-    shell: ""
+    params:
+        index='indexes/{genome}/{genome}',
+        extra=''
+    threads: 8
+
+    wrapper:
+        "0.57.0/bio/bowtie2/align"
 rule alignment_qc:
-    input: ""
+    input: expand("logs/alignment/{sample}_{genome}.log", sample=SAMPLES_INFO['SAMPLE'], genome=config['genome'])
     output: "qc/multiqc/bams.html"
     benchmark: "benchmarks/qc/multiqc/alignment.txt"
     log: "logs/qc/multiqc/alignment.log"
-    shell: ""
+    conda: "envs/multi_qc.yaml"
+    params:
+        outdir="qc/multiqc",
+        filename="bams.html"
+    shell: "multiqc {input} -o {params.outdir} -n {params.filename}"
 
 rule get_coverage:
     input: ""
