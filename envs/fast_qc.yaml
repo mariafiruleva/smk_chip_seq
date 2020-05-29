@@ -1,4 +1,5 @@
 channels:
+ - conda-forge
  - bioconda
 dependencies:
- - bioconda-fastqc=08-01-19
+ - fastqc=0.11.9
