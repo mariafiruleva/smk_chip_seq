@@ -8,7 +8,7 @@ Input reads are assumed to be single-end.
 ## Pipeline execution
 
 ```
-snakemake -s analysis.smk --use-conda
+snakemake --use-conda -j 5
 ```
 
 You can also set number of cores using `-j` parameter.

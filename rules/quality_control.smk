@@ -2,21 +2,12 @@ rule fast_qc:
     input:lambda wildcards: expand("reads/{file_name}", file_name=SAMPLES_INFO.loc[SAMPLES_INFO['SAMPLE'] == wildcards.sample, 'File'])
     output:
           html="qc/fastqc/{sample}.html",
-          archive="qc/fastqc/{sample}_fastqc.zip"
+          zip="qc/fastqc/{sample}_fastqc.zip"
     benchmark: "benchmarks/qc/fastqc/{sample}.txt"
     log: "logs/qc/fastqc/{sample}.log"
-    conda:
-         "../envs/fast_qc.yaml"
     threads: 10
-    params:
-          out_dir="qc/fastqc",
-          out_sample=lambda wildcards: re.sub('SRX\d*/|.fastq', '', list(
-              SAMPLES_INFO.loc[SAMPLES_INFO['SAMPLE'] == wildcards.sample, 'File'].to_dict().values())[0])
-    shell: """
-    fastqc {input} -o {params.out_dir} 2> {log}
-    mv {params.out_dir}/{params.out_sample}*zip {output.archive}
-    mv {params.out_dir}/{params.out_sample}*html {output.html}
-    """
+    params: ""
+    wrapper: "0.59.1/bio/fastqc"
 
 rule multi_qc:
     input: expand("qc/fastqc/{sample}.html", sample=SAMPLES_INFO['SAMPLE'])
